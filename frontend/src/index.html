@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ansible Management Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1><i class="fas fa-cogs"></i> Ansible Management Portal</h1>
+            <nav class="nav">
+                <button id="playbooksTab" class="nav-btn active" data-tab="playbooks">
+                    <i class="fas fa-play"></i> Playbooks
+                </button>
+                <button id="nodesTab" class="nav-btn" data-tab="nodes">
+                    <i class="fas fa-server"></i> Nodes
+                </button>
+                <button id="groupsTab" class="nav-btn" data-tab="groups">
+                    <i class="fas fa-layer-group"></i> Groups
+                </button>
+                <button id="executionsTab" class="nav-btn" data-tab="executions">
+                    <i class="fas fa-history"></i> Executions
+                </button>
+            </nav>
+        </header>
+
+        <main class="main">
+            <!-- Playbooks Section -->
+            <section id="playbooksSection" class="section active">
+                <div class="section-header">
+                    <h2>Playbook Management</h2>
+                    <div class="actions">
+                        <button id="refreshPlaybooks" class="btn btn-secondary">
+                            <i class="fas fa-refresh"></i> Refresh
+                        </button>
+                        <button id="executeSelected" class="btn btn-primary" disabled>
+                            <i class="fas fa-play"></i> Execute Selected
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="content-grid">
+                    <div class="playbooks-list">
+                        <h3>Available Playbooks</h3>
+                        <div id="playbooksList" class="items-list">
+                            <!-- Playbooks will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <div class="targets">
+                        <h3>Select Targets</h3>
+                        <div class="targets-tabs">
+                            <button id="nodesTargetTab" class="target-tab active">Nodes</button>
+                            <button id="groupsTargetTab" class="target-tab">Groups</button>
+                        </div>
+                        <div id="nodesTargetList" class="target-list">
+                            <!-- Nodes will be loaded here -->
+                        </div>
+                        <div id="groupsTargetList" class="target-list hidden">
+                            <!-- Groups will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Nodes Section -->
+            <section id="nodesSection" class="section">
+                <div class="section-header">
+                    <h2>Node Management</h2>
+                    <div class="actions">
+                        <button id="addNode" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Node
+                        </button>
+                        <button id="pingSelected" class="btn btn-secondary" disabled>
+                            <i class="fas fa-satellite-dish"></i> Ping Selected
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="nodesList" class="items-grid">
+                    <!-- Nodes will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Groups Section -->
+            <section id="groupsSection" class="section">
+                <div class="section-header">
+                    <h2>Group Management</h2>
+                    <div class="actions">
+                        <button id="addGroup" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Group
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="groupsList" class="items-grid">
+                    <!-- Groups will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Executions Section -->
+            <section id="executionsSection" class="section">
+                <div class="section-header">
+                    <h2>Execution History</h2>
+                    <div class="actions">
+                        <button id="refreshExecutions" class="btn btn-secondary">
+                            <i class="fas fa-refresh"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="executionsList" class="items-list">
+                    <!-- Executions will be loaded here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="nodeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="nodeModalTitle">Add Node</h3>
+                <span class="close" id="closeNodeModal">&times;</span>
+            </div>
+            <form id="nodeForm">
+                <div class="form-group">
+                    <label for="nodeName">Name:</label>
+                    <input type="text" id="nodeName" required>
+                </div>
+                <div class="form-group">
+                    <label for="nodeHostname">Hostname/IP:</label>
+                    <input type="text" id="nodeHostname" required>
+                </div>
+                <div class="form-group">
+                    <label for="nodeUsername">Username:</label>
+                    <input type="text" id="nodeUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="nodePort">Port:</label>
+                    <input type="number" id="nodePort" value="22">
+                </div>
+                <div class="form-group">
+                    <label for="nodeDescription">Description:</label>
+                    <textarea id="nodeDescription"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelNode">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="groupModalTitle">Add Group</h3>
+                <span class="close" id="closeGroupModal">&times;</span>
+            </div>
+            <form id="groupForm">
+                <div class="form-group">
+                    <label for="groupName">Name:</label>
+                    <input type="text" id="groupName" required>
+                </div>
+                <div class="form-group">
+                    <label for="groupDescription">Description:</label>
+                    <textarea id="groupDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Select Nodes:</label>
+                    <div id="groupNodesList" class="checkbox-list">
+                        <!-- Nodes checkboxes will be loaded here -->
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelGroup">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="executionModal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>Execution Details</h3>
+                <span class="close" id="closeExecutionModal">&times;</span>
+            </div>
+            <div id="executionDetails">
+                <!-- Execution details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="notifications" class="notifications"></div>
+</body>
+</html>
