@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ansible_portal
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: portal_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ansible-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - ansible-network
+
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=postgresql://portal_user:portal_password@postgres:5432/ansible_portal
+      - REDIS_URL=redis://redis:6379
+      - FLASK_ENV=production
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ansible-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - ansible-network
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ansible-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ansible-network:
+    driver: bridge
