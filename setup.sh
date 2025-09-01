@@ -2,81 +2,37 @@
 
 echo "Setting up Ansible Management Portal..."
 
-# Check if Docker and Docker Compose are installed
-if ! command -v docker &> /dev/null; then
-    echo "Docker is not installed. Please install Docker first."
-    exit 1
-fi
-
-if ! command -v docker-compose &> /dev/null; then
+# Check if Docker Compose is available (V2 or V1)
+if command -v "docker compose" &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v "docker-compose" &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
     echo "Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
 
+echo "Using: $DOCKER_COMPOSE"
+
 # Create necessary directories
-echo "Creating directories..."
 mkdir -p data/playbooks
 mkdir -p data/inventory
 mkdir -p data/logs
-mkdir -p data/ssh_keys
 
 # Set proper permissions
 chmod 755 data/playbooks
 chmod 755 data/inventory
 chmod 755 data/logs
-chmod 700 data/ssh_keys
 
-# Generate SSH key if it doesn't exist
-if [ ! -f "data/ssh_keys/id_rsa" ]; then
-    echo "Generating SSH key for Ansible..."
-    ssh-keygen -t rsa -b 4096 -f data/ssh_keys/id_rsa -N "" -C "ansible-portal"
-    chmod 600 data/ssh_keys/id_rsa
-    chmod 644 data/ssh_keys/id_rsa.pub
+# Create sample playbooks if they don't exist
+if [ ! -f "data/playbooks/update-system.yml" ]; then
+    echo "Creating sample playbooks..."
     
-    echo ""
-    echo "SSH public key generated. Add this to your target machines:"
-    echo "----------------------------------------"
-    cat data/ssh_keys/id_rsa.pub
-    echo "----------------------------------------"
-fi
-
-# Create sample playbooks
-echo "Creating sample playbooks..."
-
-cat > data/playbooks/ping-test.yml << 'EOF'
----
-- name: Simple ping test
-  hosts: all
-  gather_facts: no
-  
-  tasks:
-    - name: Ping test
-      ping:
-EOF
-
-cat > data/playbooks/system-info.yml << 'EOF'
----
-- name: Gather system information
-  hosts: all
-  gather_facts: yes
-  
-  tasks:
-    - name: Display system info
-      debug:
-        msg: |
-          Hostname: {{ ansible_hostname }}
-          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
-          Architecture: {{ ansible_architecture }}
-          Memory: {{ ansible_memtotal_mb }}MB
-          CPU Cores: {{ ansible_processor_vcpus }}
-EOF
-
-cat > data/playbooks/update-system.yml << 'EOF'
+    cat > data/playbooks/update-system.yml << 'EOF'
 ---
 - name: Update system packages
   hosts: all
   become: yes
-  gather_facts: yes
   
   tasks:
     - name: Update apt cache (Ubuntu/Debian)
@@ -97,23 +53,129 @@ cat > data/playbooks/update-system.yml << 'EOF'
       when: ansible_os_family == "RedHat"
 EOF
 
-echo "Sample playbooks created in data/playbooks/"
+    cat > data/playbooks/install-docker.yml << 'EOF'
+---
+- name: Install Docker
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: Install required packages
+      package:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+      when: ansible_os_family == "Debian"
+    
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+    
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+    
+    - name: Install Docker
+      package:
+        name: docker-ce
+        state: present
+    
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+    
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+EOF
 
-# Stop any existing containers
-echo "Stopping existing containers..."
-docker-compose down
+    cat > data/playbooks/setup-monitoring.yml << 'EOF'
+---
+- name: Setup basic monitoring
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: Install monitoring tools
+      package:
+        name:
+          - htop
+          - iotop
+          - nethogs
+          - ncdu
+          - tree
+        state: present
+    
+    - name: Create monitoring script directory
+      file:
+        path: /opt/monitoring
+        state: directory
+        mode: '0755'
+    
+    - name: Create system info script
+      copy:
+        content: |
+          #!/bin/bash
+          echo "=== System Information ==="
+          echo "Hostname: $(hostname)"
+          echo "Uptime: $(uptime)"
+          echo "Load Average: $(cat /proc/loadavg)"
+          echo "Memory Usage:"
+          free -h
+          echo "Disk Usage:"
+          df -h
+          echo "Top Processes:"
+          ps aux --sort=-%cpu | head -10
+        dest: /opt/monitoring/sysinfo.sh
+        mode: '0755'
+    
+    - name: Add monitoring cron job
+      cron:
+        name: "System monitoring"
+        minute: "*/15"
+        job: "/opt/monitoring/sysinfo.sh >> /var/log/sysmon.log"
+EOF
 
-# Build and start services
+    echo "Sample playbooks created."
+fi
+
+# Generate SSH key if it doesn't exist
+if [ ! -f "data/ssh_key" ]; then
+    echo "Generating SSH key for Ansible..."
+    ssh-keygen -t rsa -b 4096 -f data/ssh_key -N "" -C "ansible-portal"
+    chmod 600 data/ssh_key
+    chmod 644 data/ssh_key.pub
+    
+    echo ""
+    echo "SSH public key generated. Add this to your target machines:"
+    echo "----------------------------------------"
+    cat data/ssh_key.pub
+    echo "----------------------------------------"
+fi
+
+echo ""
 echo "Building and starting services..."
-docker-compose build --no-cache
-docker-compose up -d
+$DOCKER_COMPOSE build
+$DOCKER_COMPOSE up -d
 
+echo ""
 echo "Waiting for services to start..."
-sleep 30
+sleep 15
 
-# Check service health
+echo ""
 echo "Checking service status..."
-docker-compose ps
+$DOCKER_COMPOSE ps
 
 echo ""
 echo "Setup complete!"
@@ -121,14 +183,15 @@ echo ""
 echo "Access the portal at: http://localhost"
 echo ""
 echo "To add the SSH key to target machines, run:"
-echo "ssh-copy-id -i data/ssh_keys/id_rsa.pub user@target-machine"
+echo "ssh-copy-id -i data/ssh_key.pub user@target-machine"
 echo ""
 echo "Or manually add this public key to ~/.ssh/authorized_keys on target machines:"
-if [ -f "data/ssh_keys/id_rsa.pub" ]; then
-    cat data/ssh_keys/id_rsa.pub
+if [ -f "data/ssh_key.pub" ]; then
+    cat data/ssh_key.pub
 fi
 echo ""
-echo "Troubleshooting:"
-echo "- View logs: docker-compose logs [service-name]"
-echo "- Restart services: docker-compose restart"
-echo "- Stop services: docker-compose down"
+echo "Useful commands:"
+echo "  View logs: $DOCKER_COMPOSE logs"
+echo "  Stop services: $DOCKER_COMPOSE down"
+echo "  Restart services: $DOCKER_COMPOSE restart"
+echo "  View service status: $DOCKER_COMPOSE ps"
