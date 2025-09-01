@@ -1,0 +1,44 @@
+---
+- name: Setup basic monitoring
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: Install monitoring tools
+      package:
+        name:
+          - htop
+          - iotop
+          - nethogs
+          - ncdu
+          - tree
+        state: present
+    
+    - name: Create monitoring script directory
+      file:
+        path: /opt/monitoring
+        state: directory
+        mode: '0755'
+    
+    - name: Create system info script
+      copy:
+        content: |
+          #!/bin/bash
+          echo "=== System Information ==="
+          echo "Hostname: $(hostname)"
+          echo "Uptime: $(uptime)"
+          echo "Load Average: $(cat /proc/loadavg)"
+          echo "Memory Usage:"
+          free -h
+          echo "Disk Usage:"
+          df -h
+          echo "Top Processes:"
+          ps aux --sort=-%cpu | head -10
+        dest: /opt/monitoring/sysinfo.sh
+        mode: '0755'
+    
+    - name: Add monitoring cron job
+      cron:
+        name: "System monitoring"
+        minute: "*/15"
+        job: "/opt/monitoring/sysinfo.sh >> /var/log/sysmon.log"
