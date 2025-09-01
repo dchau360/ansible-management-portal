@@ -13,6 +13,11 @@ services:
       - "5432:5432"
     networks:
       - ansible-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal_user -d ansible_portal"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -20,6 +25,11 @@ services:
       - "6379:6379"
     networks:
       - ansible-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   backend:
     build: ./backend
@@ -27,25 +37,30 @@ services:
       - DATABASE_URL=postgresql://portal_user:portal_password@postgres:5432/ansible_portal
       - REDIS_URL=redis://redis:6379
       - FLASK_ENV=production
+      - PYTHONPATH=/app
     volumes:
       - ./data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/ssh_keys:/app/ssh_keys
     ports:
       - "5000:5000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - ansible-network
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       - backend
     networks:
       - ansible-network
+    restart: unless-stopped
 
   nginx:
     build: ./nginx
@@ -56,6 +71,7 @@ services:
       - backend
     networks:
       - ansible-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
