@@ -1,13 +1,30 @@
-FROM node:18-alpine
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json .
-RUN npm install
+# Copy package files
+COPY package*.json ./
+COPY webpack.config.js ./
+COPY .babelrc ./
 
-COPY . .
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY src/ ./src/
+
+# Build the application
 RUN npm run build
 
-EXPOSE 3000
+# Production stage
+FROM nginx:alpine
 
-CMD ["npm", "start"]
+# Copy built files to nginx
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
