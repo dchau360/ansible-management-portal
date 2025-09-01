@@ -6,30 +6,22 @@
   "scripts": {
     "start": "http-server dist -p 3000 -a 0.0.0.0",
     "build": "webpack --mode production",
-    "dev": "webpack serve --mode development --host 0.0.0.0",
-    "watch": "webpack --mode development --watch"
+    "dev": "webpack serve --mode development --host 0.0.0.0"
   },
   "dependencies": {
     "axios": "^1.5.0",
-    "socket.io-client": "^4.7.2"
+    "socket.io-client": "^4.7.2",
+    "http-server": "^14.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.22.0",
     "@babel/preset-env": "^7.22.0",
-    "babel-loader": "^9.1.2",
+    "babel-loader": "^9.1.0",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1",
     "html-webpack-plugin": "^5.5.3",
     "css-loader": "^6.8.1",
-    "style-loader": "^3.3.3",
-    "file-loader": "^6.2.0",
-    "url-loader": "^4.1.1",
-    "http-server": "^14.1.1"
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+    "style-loader": "^3.3.3"
+  }
 }
